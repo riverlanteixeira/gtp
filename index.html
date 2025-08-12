@@ -1,5 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html>// ... existing code ...
+<script>
+    function updateCompass(currentLocation, targetLocation) {
+        const deltaX = targetLocation.lng - currentLocation.lng;
+        const deltaY = targetLocation.lat - currentLocation.lat;
+        const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        const compassElement = document.getElementById('compass-direction');
+        compassElement.style.transform = `rotate(${angle}deg)`;
+    }
+
+    function setupCompass() {
+        const compassContainer = document.createElement('div');
+        compassContainer.id = 'compass-container';
+        compassContainer.style.position = 'fixed';
+        compassContainer.style.top = '10px';
+        compassContainer.style.left = '50%';
+        compassContainer.style.transform = 'translateX(-50%)';
+        compassContainer.style.zIndex = '100';
+
+        const compassDirection = document.createElement('div');
+        compassDirection.id = 'compass-direction';
+        compassDirection.style.width = '50px';
+        compassDirection.style.height = '50px';
+        compassDirection.style.border = '2px solid red';
+        compassDirection.style.borderRadius = '50%';
+        compassDirection.style.background = 'rgba(255, 0, 0, 0.5)';
+
+        compassContainer.appendChild(compassDirection);
+        document.body.appendChild(compassContainer);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupCompass();
+
+        // Exemplo de uso: Atualizar a bússola com a posição atual e o destino
+        const currentLocation = { lat: -27.6398, lng: -48.6678 }; // Exemplo de posição atual
+        const targetLocation = { lat: -27.6399, lng: -48.6679 }; // Exemplo de destino
+
+        updateCompass(currentLocation, targetLocation);
+    });
+</script>
+// ... existing code ...// ... existing code ...
+<script>
+    function updateCompass(currentLocation, targetLocation) {
+        const deltaX = targetLocation.lng - currentLocation.lng;
+        const deltaY = targetLocation.lat - currentLocation.lat;
+        const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        const compassElement = document.getElementById('compass-direction');
+        compassElement.style.transform = `rotate(${angle}deg)`;
+    }
+
+    function setupCompass() {
+        const compassContainer = document.createElement('div');
+        compassContainer.id = 'compass-container';
+        compassContainer.style.position = 'fixed';
+        compassContainer.style.top = '10px';
+        compassContainer.style.left = '50%';
+        compassContainer.style.transform = 'translateX(-50%)';
+        compassContainer.style.zIndex = '100';
+
+        const compassDirection = document.createElement('div');
+        compassDirection.id = 'compass-direction';
+        compassDirection.style.width = '50px';
+        compassDirection.style.height = '50px';
+        compassDirection.style.border = '2px solid red';
+        compassDirection.style.borderRadius = '50%';
+        compassDirection.style.background = 'rgba(255, 0, 0, 0.5)';
+
+        compassContainer.appendChild(compassDirection);
+        document.body.appendChild(compassContainer);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupCompass();
+
+        // Exemplo de uso: Atualizar a bússola com a posição atual e o destino
+        const currentLocation = { lat: -27.6398, lng: -48.6678 }; // Exemplo de posição atual
+        const targetLocation = { lat: -27.6399, lng: -48.6679 }; // Exemplo de destino
+
+        updateCompass(currentLocation, targetLocation);
+    });
+</script>
+// ... existing code ...
 
 <head>
     <meta charset="utf-8">
@@ -840,6 +924,22 @@
         <!-- Container de notificações toast -->
         <div id="toast-container"></div>
 
+        <!-- Sistema de Navegação com Bússola -->
+        <div id="navigation-container" class="ui-element" style="display: none;">
+            <div id="compass-container">
+                <div id="compass-outer">
+                    <div id="compass-inner">
+                        <div id="direction-arrow">📍</div>
+                        <div id="distance-text">Calculando...</div>
+                    </div>
+                </div>
+                <div id="target-info">
+                    <div id="target-name">Bicicleta</div>
+                    <div id="target-distance">--m</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Botão de debug temporário -->
         <button id="debug-collect"
             style="position: fixed; bottom: 20px; right: 20px; z-index: 30; padding: 10px; background: #ff0000; color: white; border: none; border-radius: 5px; display: none;">
@@ -1188,12 +1288,46 @@
             simulateLoading();
 
             enterButton.addEventListener('click', async () => {
+                loadingScreen.classList.add('hidden');
+
                 try {
-                    await sceneEl.enterAR();
-                    loadingInfo.innerText = "Iniciando AR...";
-                } catch (e) {
-                    loadingInfo.innerText = "AR não suportado. Use um navegador e celular compatíveis.";
-                    console.error(e);
+                    const session = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['local-floor', 'hit-test'],
+                        optionalFeatures: ['dom-overlay'],
+                        domOverlay: { root: document.getElementById('overlay') }
+                    });
+
+                    session.addEventListener('end', () => {
+                        console.log('Sessão AR terminou');
+                        // Resetar elementos da interface
+                        document.getElementById('backpack-icon').style.display = 'none';
+                        hideNavigation(); // Esconder navegação ao sair do AR
+                        loadingScreen.classList.remove('hidden');
+                    });
+
+                    sceneEl.xr.setSession(session);
+                    console.log('Sessão AR iniciada com sucesso');
+
+                    // Mostrar elementos da interface AR
+                    document.getElementById('backpack-icon').style.display = 'flex';
+                    showToast("Bem-vindo ao Mundo Invertido! Toque no ícone da mochila para ver seus objetivos.", 'info', 5000);
+
+                    // Configurar sistema de toque para coleta
+                    setupTouchInteraction();
+
+                    // Inicializar sistema de navegação
+                    initializeNavigation();
+                    showNavigation();
+
+                    // Setup do hit test para AR
+                    const renderer = sceneEl.renderer;
+                    const xrSession = renderer.xr.getSession();
+                    if (xrSession) {
+                        setupHitTest(xrSession, renderer);
+                    }
+                } catch (error) {
+                    console.error('Erro ao iniciar AR:', error);
+                    showToast("Erro ao iniciar AR. Verifique se seu dispositivo suporta WebXR.", 'error', 5000);
                 }
             });
 
